@@ -125,15 +125,15 @@ class BaseEngine:
             # Validation
             if (self.val_period > 0) and (epoch % self.val_period == 0):
                 self.save_checkpoint(post_fix=None)
-                # self.model.eval()
+                self.model.eval()
                 
                 # print(f"Evaluating on Epoch {epoch}...", indent=True)
-                # eval_dict = self.evaluate()
+                eval_dict = self.evaluate()
 
-                # # Write evaluation results to tensorboard.
-                # self._update_dict_to_writer(eval_dict, tag='eval')
+                # Write evaluation results to tensorboard.
+                self._update_dict_to_writer(eval_dict, tag='eval')
                 
-                # self.model.train()
+                self.model.train()
                 
                 # # Save Checkpoint (.pth)
                 # self.save_checkpoint(post_fix=None)

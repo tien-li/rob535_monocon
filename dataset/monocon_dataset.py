@@ -10,6 +10,8 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from transforms import *
 from dataset.base_dataset import BaseKITTIMono3DDataset
 
+import cv2
+
 
 DEFAULT_FILTER_CONFIG = {
     'min_height': 25,
@@ -78,11 +80,18 @@ class MonoConDataset(BaseKITTIMono3DDataset):
         image, img_metas = self.load_image(idx)
         calib = self.load_calib(idx)
         
-        # Raw State: Cam0 + Bottom-Center + Global Yaw
-        # Converted to Cam2 + Local Yaw
-        raw_labels = self.load_label(idx)
-        raw_labels.convert_cam(src_cam=0, dst_cam=2)
-        raw_labels.convert_yaw(src_type='global', dst_type='local')
+
+        raw_labels = []
+        if self.split != 'test':
+            # Raw State: Cam0 + Bottom-Center + Global Yaw
+            # Converted to Cam2 + Local Yaw
+            raw_labels = self.load_label(idx)
+            raw_labels.convert_cam(src_cam=0, dst_cam=2)
+            raw_labels.convert_yaw(src_type='global', dst_type='local')
+
+        # Data Augmentation include
+        if self.split == "train":
+            image, raw_label = self.image_augmentation(image, raw_labels)
         
         new_labels = self._create_empty_labels()
         
@@ -156,6 +165,58 @@ class MonoConDataset(BaseKITTIMono3DDataset):
         
         result_dict = self.transforms(result_dict)
         return result_dict
+
+    def image_augmentation(self, image, raw_labels):
+        # Apply horizontal flip with a probability of 0.5
+        # if np.random.rand() < 0.5:
+        #     image = cv2.flip(image, 1)  # 1 denotes horizontal flip
+        #     raw_labels.flip(image.shape[1])  # Update labels accordingly
+
+        # Apply Gaussian noise
+        # if self.split == 'train':
+        #     mean = 0
+        #     var = 10
+        #     sigma = var ** 0.5
+        #     gaussian = np.random.normal(mean, sigma, (image.shape[0],image.shape[1]))
+        #     noisy_image = image + gaussian
+            
+            # image = GaussianNoise()(image=image)['image']
+
+
+        if self.split == 'train':
+            alpha = np.random.randint(0, 30) / 100  # Alpha controls the degree of grayness (0 = grayscale, 1 = original color)
+            gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            gray_image = cv2.cvtColor(gray_image, cv2.COLOR_GRAY2BGR)  # Convert back to BGR format
+            image = cv2.addWeighted(image, alpha, gray_image, 1 - alpha, 0)
+
+            def adjust_brightness_contrast(img, brightness=0, contrast=0):
+                if brightness != 0:
+                    if brightness > 0:
+                        shadow = brightness
+                        highlight = 255
+                    else:
+                        shadow = 0
+                        highlight = 255 + brightness
+                    alpha_b = (highlight - shadow) / 255
+                    gamma_b = shadow
+                    
+                    buf = cv2.addWeighted(img, alpha_b, img, 0, gamma_b)
+                else:
+                    buf = img.copy()
+
+                if contrast != 0:
+                    f = 131 * (contrast + 127) / (127 * (131 - contrast))
+                    alpha_c = f
+                    gamma_c = 127 * (1 - f)
+                    
+                    buf = cv2.addWeighted(buf, alpha_c, buf, 0, gamma_c)
+
+                return buf
+            # Apply fog effect
+            brightness_para = np.random.randint(-150, 150)
+            image = adjust_brightness_contrast(image, brightness=brightness_para, contrast=-50)
+
+        return image, raw_labels
             
     def _create_empty_labels(self) -> Dict[str, np.ndarray]:
         annot_dict = {

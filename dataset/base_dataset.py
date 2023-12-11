@@ -31,12 +31,13 @@ class BaseKITTIMono3DDataset(Dataset):
         
         assert split in ['train', 'val', 'trainval', 'test']
         self.split = split
-        
+        print(IMAGESET_DIR + f'/{split}.txt')
         with open(os.path.join(IMAGESET_DIR, f'{split}.txt')) as f:
             file_prefix = f.readlines()
         self.file_prefix = [fp.replace('\n', '') for fp in file_prefix]
         
         sub_root = 'testing' if (split == 'test') else 'training'
+        print(sub_root)
         
         # Image Files
         self.image_dir = os.path.join(base_root, sub_root, 'image_2')
